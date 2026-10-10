@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Classroom Random Picker & Question Drawer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts & FontAwesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            display: ['Outfit', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+            },
+            accent: {
+              500: '#6366f1',
+              600: '#4f46e5',
+            }
+          },
+          animation: {
+            'pulse-fast': 'pulse 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'bounce-short': 'bounce 0.6s ease-in-out 2',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    .slot-blur {
+      filter: blur(2px);
+      opacity: 0.7;
+      transform: scale(0.98);
+    }
+    .glow-card {
+      box-shadow: 0 0 50px -10px rgba(99, 102, 241, 0.25);
+    }
+    .glow-card-active {
+      box-shadow: 0 0 80px -5px rgba(34, 197, 94, 0.4);
+    }
+    /* Custom Scrollbar for list areas */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur px-6 py-3.5 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-emerald-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+        <i class="fa-solid font-bold fa-dice text-xl"></i>
+      </div>
+      <div>
+        <h1 class="font-display font-bold text-xl tracking-tight text-white flex items-center gap-2">
+          ClassPicker <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">Live</span>
+        </h1>
+        <p class="text-xs text-slate-400">Random Student & Prompt Selection Engine</p>
+      </div>
+    </div>
+
+    <!-- Quick Controls Top Bar -->
+    <div class="flex items-center gap-3">
+      <button id="toggleFullscreenBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-2 transition">
+        <i class="fa-solid fa-expand"></i> Fullscreen
+      </button>
+      <button id="soundToggleBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-2 transition">
+        <i id="soundIcon" class="fa-solid fa-volume-high text-emerald-400"></i> Sound On
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 overflow-hidden">
+
+    <!-- LEFT COLUMN: Roster & Prompt Config Panel (4 Columns) -->
+    <section class="lg:col-span-4 flex flex-col gap-5 overflow-y-auto pr-1">
+      
+      <!-- Stats / Counter Card -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+          <span class="text-xs text-slate-400 font-medium">Active Pool</span>
+          <div class="flex items-baseline gap-1 mt-2">
+            <span id="activeCount" class="text-2xl font-display font-bold text-emerald-400">0</span>
+            <span id="totalStudentsCount" class="text-xs text-slate-500">/ 0 total</span>
+          </div>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+          <span class="text-xs text-slate-400 font-medium">Question Bank</span>
+          <div class="mt-2">
+            <span id="questionsCount" class="text-2xl font-display font-bold text-indigo-400">0</span>
+            <span class="text-xs text-slate-500"> prompts</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Accordion / Settings -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col gap-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <h2 class="font-display font-semibold text-slate-200 flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-indigo-400"></i> Draw Rules
+          </h2>
+          <button id="resetPoolBtn" class="text-xs text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1.5 transition px-2.5 py-1 rounded-md bg-amber-400/10 border border-amber-400/20">
+            <i class="fa-solid fa-rotate-right"></i> Reset Pool
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <label for="noRepeatToggle" class="text-sm font-medium text-slate-300 cursor-pointer select-none">
+            Prevent Repeat Picks
+            <span class="block text-xs text-slate-500 font-normal">Remove picked students until pool is reset</span>
+          </label>
+          <input type="checkbox" id="noRepeatToggle" class="w-5 h-5 accent-indigo-500 rounded cursor-pointer" checked />
+        </div>
+      </div>
+
+      <!-- Input Textareas -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex-1 flex flex-col gap-4 min-h-[360px]">
+        
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-slate-800 gap-4">
+          <button id="tabRosterBtn" class="pb-2.5 font-display text-sm font-semibold border-b-2 border-indigo-500 text-indigo-400 transition flex items-center gap-2">
+            <i class="fa-solid fa-users"></i> Student Roster
+          </button>
+          <button id="tabQuestionsBtn" class="pb-2.5 font-display text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2">
+            <i class="fa-solid fa-lightbulb"></i> Question Bank
+          </button>
+        </div>
+
+        <!-- Roster Input Container -->
+        <div id="tabRoster" class="flex-1 flex flex-col gap-2">
+          <label class="text-xs text-slate-400">Enter names (one name per line):</label>
+          <textarea id="rosterInput" class="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition font-mono resize-none" placeholder="Alex Morgan&#10;Jordan Taylor&#10;Sam Rivera&#10;Chris Lee"></textarea>
+        </div>
+
+        <!-- Questions Input Container -->
+        <div id="tabQuestions" class="flex-1 flex-col gap-2 hidden">
+          <label class="text-xs text-slate-400">Enter prompts (one prompt per line):</label>
+          <textarea id="questionsInput" class="flex-1 w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition font-mono resize-none" placeholder="Explain this concept in your own words.&#10;What is a real-world application of today's lesson?&#10;What question do you still have?"></textarea>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex items-center gap-2 pt-2">
+          <button id="saveDataBtn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-2 border border-slate-700">
+            <i class="fa-solid fa-floppy-disk text-indigo-400"></i> Save Lists
+          </button>
+          <button id="loadPresetBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs py-2.5 px-3 rounded-xl transition border border-slate-700" title="Load Demo Sample Data">
+            Demo Data
+          </button>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: Interactive Projection Stage & History (8 Columns) -->
+    <section class="lg:col-span-8 flex flex-col gap-6 justify-between overflow-hidden">
+      
+      <div id="stageCard" class="glow-card bg-slate-900 border border-slate-800/80 rounded-3xl p-8 sm:p-12 flex flex-col justify-between items-center text-center relative overflow-hidden flex-1 min-h-[380px]">
+        
+        <!-- Background subtle grid effect -->
+        <div class="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:2rem_2rem] pointer-events-none"></div>
+
+        <!-- Top status indicator -->
+        <div class="z-10 flex items-center gap-2">
+          <span id="stageStatusBadge" class="px-3.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-slate-500"></span> Ready To Draw
+          </span>
+        </div>
+
+        <!-- Central Reveal Stage -->
+        <div class="z-10 my-auto w-full max-w-2xl px-4 py-6 flex flex-col items-center justify-center min-h-[200px]">
+          
+          <!-- Selected Student Display -->
+          <div class="mb-6">
+            <span class="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-2 block">Selected Student</span>
+            <div id="studentDisplay" class="font-display text-4xl sm:text-6xl font-black text-white tracking-tight transition-all duration-200">
+              ???
+            </div>
+          </div>
+
+          <!-- Divider line -->
+          <div class="w-24 h-1 rounded-full bg-gradient-to-r from-indigo-500/20 via-emerald-500/40 to-indigo-500/20 my-2"></div>
+
+          <!-- Selected Question Display -->
+          <div class="mt-4">
+            <span class="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2 block">Discussion Prompt</span>
+            <div id="questionDisplay" class="text-lg sm:text-2xl font-medium text-slate-300 leading-relaxed transition-all duration-200 max-w-xl mx-auto italic">
+              "Click the button below to randomly select a student and prompt."
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Primary Giant Draw Button -->
+        <div class="z-10 w-full max-w-md pt-4">
+          <button id="drawBtn" class="w-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white font-display font-bold text-xl sm:text-2xl py-4 sm:py-5 px-8 rounded-2xl shadow-xl shadow-indigo-600/30 hover:shadow-indigo-600/50 hover:scale-[1.02] active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-3 border border-white/10">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>DRAW STUDENT & PROMPT</span>
+          </button>
+        </div>
+
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 flex flex-col h-48">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <h3 class="font-display font-semibold text-sm text-slate-300 flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i> Session History
+          </h3>
+          <button id="clearHistoryBtn" class="text-xs text-slate-500 hover:text-slate-300 transition">
+            Clear History
+          </button>
+        </div>
+
+        <div id="historyList" class="flex-1 overflow-y-auto mt-3 space-y-2 pr-1 text-xs">
+          <p id="emptyHistoryMsg" class="text-slate-600 italic text-center py-6">No draws recorded in this session yet.</p>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Notification Toast Container -->
+  <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 border border-slate-700 text-slate-200 px-4 py-3 rounded-xl shadow-2xl opacity-0 translate-y-4 transition-all pointer-events-none flex items-center gap-2 text-sm z-50">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toastMsg">Notification message</span>
+  </div>
+
+  <script>
+    // Audio Synth Web Audio API for sound effects (no external audio assets needed)
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+
+      playTick() {
+        if (!this.enabled) return;
+        this.init();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400 + Math.random() * 200, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.04);
+      }
+
+      playWinner() {
+        if (!this.enabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.15, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.3);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.3);
+        });
+      }
+    }
+
+    const sounds = new SoundEffects();
+
+    // Default Preset Data
+    const DEFAULT_STUDENTS = [
+      "Alex Morgan", "Jordan Taylor", "Taylor Swift", "Morgan Vance",
+      "Sam Rivera", "Chris Lee", "Pat Cummins", "Riley Davis",
+      "Avery Martinez", "Dakota Johnson", "Reese Witherspoon", "Quinn Fabray"
+    ];
+
+    const DEFAULT_QUESTIONS = [
+      "Explain this core concept in your own words.",
+      "What is one real-world application or example of this topic?",
+      "What is one question or point of confusion you still have about this lesson?",
+      "Summarize the most important takeaway from today's discussion.",
+      "How does this topic relate to what we covered last week?",
+      "How would you explain this topic to someone who has never studied it before?"
+    ];
+
+    // State Variables
+    let students = [];
+    let activePool = [];
+    let questions = [];
+    let history = [];
+    let isDrawing = false;
+
+    // DOM Elements
+    const rosterInput = document.getElementById('rosterInput');
+    const questionsInput = document.getElementById('questionsInput');
+    const noRepeatToggle = document.getElementById('noRepeatToggle');
+    const activeCountEl = document.getElementById('activeCount');
+    const totalStudentsCountEl = document.getElementById('totalStudentsCount');
+    const questionsCountEl = document.getElementById('questionsCount');
+    const studentDisplay = document.getElementById('studentDisplay');
+    const questionDisplay = document.getElementById('questionDisplay');
+    const drawBtn = document.getElementById('drawBtn');
+    const resetPoolBtn = document.getElementById('resetPoolBtn');
+    const saveDataBtn = document.getElementById('saveDataBtn');
+    const loadPresetBtn = document.getElementById('loadPresetBtn');
+    const historyList = document.getElementById('historyList');
+    const emptyHistoryMsg = document.getElementById('emptyHistoryMsg');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    const stageStatusBadge = document.getElementById('stageStatusBadge');
+    const stageCard = document.getElementById('stageCard');
+    const soundToggleBtn = document.getElementById('soundToggleBtn');
+    const soundIcon = document.getElementById('soundIcon');
+
+    function init() {
+      loadSavedData();
+      setupEventListeners();
+      updateUICounters();
+    }
+
+    function loadSavedData() {
+      const savedStudents = localStorage.getItem('cp_students');
+      const savedQuestions = localStorage.getItem('cp_questions');
+      const savedPool = localStorage.getItem('cp_active_pool');
+
+      if (savedStudents) {
+        students = JSON.parse(savedStudents);
+        rosterInput.value = students.join('\n');
+      } else {
+        students = [...DEFAULT_STUDENTS];
+        rosterInput.value = DEFAULT_STUDENTS.join('\n');
+      }
+
+      if (savedQuestions) {
+        questions = JSON.parse(savedQuestions);
+        questionsInput.value = questions.join('\n');
+      } else {
+        questions = [...DEFAULT_QUESTIONS];
+        questionsInput.value = DEFAULT_QUESTIONS.join('\n');
+      }
+
+      if (savedPool) {
+        activePool = JSON.parse(savedPool);
+      } else {
+        activePool = [...students];
+      }
+    }
+
+    function saveData() {
+      // Parse inputs
+      const newStudents = rosterInput.value
+        .split('\n')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      const newQuestions = questionsInput.value
+        .split('\n')
+        .map(q => q.trim())
+        .filter(q => q.length > 0);
+
+      students = newStudents;
+      questions = newQuestions;
+
+      // Sync active pool (keep existing valid candidates or reset)
+      activePool = activePool.filter(s => students.includes(s));
+      if (activePool.length === 0 && students.length > 0) {
+        activePool = [...students];
+      }
+
+      localStorage.setItem('cp_students', JSON.stringify(students));
+      localStorage.setItem('cp_questions', JSON.stringify(questions));
+      localStorage.setItem('cp_active_pool', JSON.stringify(activePool));
+
+      updateUICounters();
+      showToast("Lists and settings saved successfully!");
+    }
+
+    function updateUICounters() {
+      activeCountEl.textContent = activePool.length;
+      totalStudentsCountEl.textContent = `/ ${students.length} total`;
+      questionsCountEl.textContent = questions.length;
+    }
+
+    function resetPool() {
+      activePool = [...students];
+      localStorage.setItem('cp_active_pool', JSON.stringify(activePool));
+      updateUICounters();
+      showToast("Student pool reset! All names are available again.");
+    }
+
+    function performDraw() {
+      if (isDrawing) return;
+
+      // Validation
+      if (students.length === 0) {
+        showToast("Please add at least one student name first.", "error");
+        return;
+      }
+
+      if (noRepeatToggle.checked && activePool.length === 0) {
+        resetPool();
+      }
+
+      const poolToUse = noRepeatToggle.checked ? activePool : students;
+      if (poolToUse.length === 0) return;
+
+      if (questions.length === 0) {
+        showToast("Please add at least one question to the bank.", "error");
+        return;
+      }
+
+      isDrawing = true;
+      drawBtn.disabled = true;
+      drawBtn.classList.add('opacity-75', 'cursor-not-allowed');
+
+      // Update badge status
+      stageStatusBadge.className = "px-3.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 uppercase tracking-wider flex items-center gap-2 animate-pulse-fast";
+      stageStatusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-400"></span> Selecting...`;
+
+      studentDisplay.classList.add('slot-blur');
+      questionDisplay.classList.add('slot-blur');
+      stageCard.classList.remove('glow-card-active');
+
+      let counter = 0;
+      const totalTicks = 24;
+      const speedMs = 70;
+
+      const timer = setInterval(() => {
+        // Random pick for animation ticker
+        const tempStudent = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+        const tempQuestion = questions[Math.floor(Math.random() * questions.length)];
+
+        studentDisplay.textContent = tempStudent;
+        questionDisplay.textContent = `"${tempQuestion}"`;
+        sounds.playTick();
+
+        counter++;
+        if (counter >= totalTicks) {
+          clearInterval(timer);
+          finalizeDraw(poolToUse);
+        }
+      }, speedMs);
+    }
+
+    function finalizeDraw(poolToUse) {
+      // Pick final winners
+      const studentIndex = Math.floor(Math.random() * poolToUse.length);
+      const chosenStudent = poolToUse[studentIndex];
+      const chosenQuestion = questions[Math.floor(Math.random() * questions.length)];
+
+      // Remove chosen student if no-repeat mode enabled
+      if (noRepeatToggle.checked) {
+        activePool = activePool.filter(s => s !== chosenStudent);
+        localStorage.setItem('cp_active_pool', JSON.stringify(activePool));
+      }
+
+      studentDisplay.textContent = chosenStudent;
+      questionDisplay.textContent = `"${chosenQuestion}"`;
+
+      studentDisplay.classList.remove('slot-blur');
+      questionDisplay.classList.remove('slot-blur');
+      stageCard.classList.add('glow-card-active');
+
+      // Play victory sound effect
+      sounds.playWinner();
+
+      // Update Status Badge
+      stageStatusBadge.className = "px-3.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider flex items-center gap-2";
+      stageStatusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> Winner Picked!`;
+
+      // Log to session history
+      addHistoryEntry(chosenStudent, chosenQuestion);
+
+      updateUICounters();
+
+      isDrawing = false;
+      drawBtn.disabled = false;
+      drawBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+    }
+
+    function addHistoryEntry(student, question) {
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      const item = { student, question, timestamp };
+      history.unshift(item);
+
+      renderHistory();
+    }
+
+    function renderHistory() {
+      if (history.length === 0) {
+        emptyHistoryMsg.classList.remove('hidden');
+        historyList.innerHTML = '';
+        historyList.appendChild(emptyHistoryMsg);
+        return;
+      }
+
+      emptyHistoryMsg.classList.add('hidden');
+      historyList.innerHTML = history.map(entry => `
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col gap-1 transition hover:border-slate-700">
+          <div class="flex items-center justify-between">
+            <span class="font-display font-bold text-slate-200 text-sm">${escapeHtml(entry.student)}</span>
+            <span class="text-[10px] text-slate-500 font-mono">${entry.timestamp}</span>
+          </div>
+          <p class="text-slate-400 text-xs italic truncate">"${escapeHtml(entry.question)}"</p>
+        </div>
+      `).join('');
+    }
+
+    function setupEventListeners() {
+      // Draw Trigger
+      drawBtn.addEventListener('click', performDraw);
+
+      // Keyboard Shortcut (Spacebar to draw)
+      document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+          e.preventDefault();
+          performDraw();
+        }
+      });
+
+      // Save Data
+      saveDataBtn.addEventListener('click', saveData);
+
+      // Reset Pool
+      resetPoolBtn.addEventListener('click', resetPool);
+
+      // Load Presets
+      loadPresetBtn.addEventListener('click', () => {
+        rosterInput.value = DEFAULT_STUDENTS.join('\n');
+        questionsInput.value = DEFAULT_QUESTIONS.join('\n');
+        saveData();
+      });
+
+      // Clear History
+      clearHistoryBtn.addEventListener('click', () => {
+        history = [];
+        renderHistory();
+        showToast("History cleared.");
+      });
+
+      // Tabs Logic
+      const tabRosterBtn = document.getElementById('tabRosterBtn');
+      const tabQuestionsBtn = document.getElementById('tabQuestionsBtn');
+      const tabRoster = document.getElementById('tabRoster');
+      const tabQuestions = document.getElementById('tabQuestions');
+
+      tabRosterBtn.addEventListener('click', () => {
+        tabRoster.classList.remove('hidden');
+        tabQuestions.classList.add('hidden');
+        tabRosterBtn.className = "pb-2.5 font-display text-sm font-semibold border-b-2 border-indigo-500 text-indigo-400 transition flex items-center gap-2";
+        tabQuestionsBtn.className = "pb-2.5 font-display text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2";
+      });
+
+      tabQuestionsBtn.addEventListener('click', () => {
+        tabQuestions.classList.remove('hidden');
+        tabRoster.classList.add('hidden');
+        tabQuestionsBtn.className = "pb-2.5 font-display text-sm font-semibold border-b-2 border-indigo-500 text-indigo-400 transition flex items-center gap-2";
+        tabRosterBtn.className = "pb-2.5 font-display text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center gap-2";
+      });
+
+      // Sound Toggle
+      soundToggleBtn.addEventListener('click', () => {
+        sounds.enabled = !sounds.enabled;
+        if (sounds.enabled) {
+          soundIcon.className = "fa-solid fa-volume-high text-emerald-400";
+          soundToggleBtn.innerHTML = `<i id="soundIcon" class="fa-solid fa-volume-high text-emerald-400"></i> Sound On`;
+        } else {
+          soundToggleBtn.innerHTML = `<i id="soundIcon" class="fa-solid fa-volume-xmark text-slate-500"></i> Sound Off`;
+        }
+      });
+
+      // Fullscreen Toggle
+      document.getElementById('toggleFullscreenBtn').addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => console.log(err));
+        } else {
+          document.exitFullscreen();
+        }
+      });
+    }
+
+    function showToast(message, type = "success") {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.textContent = message;
+      if (type === "error") {
+        toastIcon.className = "fa-solid fa-circle-exclamation text-rose-400";
+      } else {
+        toastIcon.className = "fa-solid fa-circle-check text-emerald-400";
+      }
+
+      toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+      
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+      }, 3000);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    // Start App on Load
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
